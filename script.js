@@ -1354,7 +1354,7 @@ function renderOrderFlowBody() {
   const items = order?.items || [];
   return `
     <div class="order-flow-tabs">
-      <button class="is-active">Pedido</button><button>Cliente</button><button>Pagamento</button>
+      <button class="is-active">Pedido</button>
     </div>
     <div class="staff-order-editor">
       <div class="staff-order-editor-head">
@@ -1977,4 +1977,3 @@ function showToast(message) {
 
 render();
 bootstrap();
-
