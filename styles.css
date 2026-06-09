@@ -3045,12 +3045,15 @@ button {
 /* ─── TABLE ORDER FLOW ───────────────────────────────────────────────── */
 
 .table-flow {
+  --pedido-panel-width: 320px;
+  --pedido-panel-rise: 44px; /* sobe apenas até abaixo do cabeçalho da mesa */
+
   display: grid;
-  grid-template-rows: 75px 49px minmax(0, 1fr);
+  grid-template-rows: 64px 44px minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-background);
+  position: relative;
 }
 
 .table-flow-topbar {
@@ -3131,7 +3134,7 @@ button {
 
 .table-flow-content {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   background: var(--color-background);
 }
 
@@ -3211,11 +3214,13 @@ button {
 /* ─── PEDIDO TAB ─────────────────────────────────────────────────────── */
 
 .pedido-tab-layout {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
+  padding-right: var(--pedido-panel-width);
 }
 
 .pedido-menu-area {
@@ -3301,6 +3306,13 @@ button {
 }
 
 .pedido-order-panel {
+  position: absolute;
+  top: calc(0px - var(--pedido-panel-rise));
+  right: 0;
+  width: var(--pedido-panel-width);
+  height: calc(100% + var(--pedido-panel-rise));
+  z-index: 4;
+
   background: var(--color-surface-muted);
   border-left: 1px solid var(--color-line);
   display: grid;
