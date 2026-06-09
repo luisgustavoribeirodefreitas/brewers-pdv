@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Importar clientes para Firebase</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 32px;
+        background: #f9f4ee;
+        color: #1e0f05;
+      }
+
+      button {
+        padding: 14px 22px;
+        border: 0;
+        border-radius: 10px;
+        background: #b8722a;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      pre {
+        margin-top: 24px;
+        padding: 16px;
+        background: white;
+        border-radius: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Importar clientes para Firebase</h1>
+
+    <p>
+      Clique no botão abaixo para buscar os clientes do SQLite pela rota
+      <strong>/api/clients</strong> e enviar tudo para a coleção
+      <strong>clients</strong> do Firestore.
+    </p>
+
+    <button id="importButton">Importar clientes</button>
+
+    <pre id="log">Aguardando...</pre>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+      import {
+        getFirestore,
+        doc,
+        setDoc
+      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAP8BZ8MRBIR4OfdTM4shp24qumZdZVF1A",
+        authDomain: "brewers-pdv-e5886.firebaseapp.com",
+        projectId: "brewers-pdv-e5886",
+        storageBucket: "brewers-pdv-e5886.firebasestorage.app",
+        messagingSenderId: "43541055382",
+        appId: "1:43541055382:web:94abd22fb62941b9783fb7"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const log = document.querySelector("#log");
+      const button = document.querySelector("#importButton");
+
+      function writeLog(message) {
+        log.textContent += `\n${message}`;
+      }
+
+      function cleanClient(client) {
+        return {
+          nome: client.nome || "",
+          cpf: client.cpf || "",
+          celular: client.celular || "",
+          nascimento: client.nascimento || "",
+          endereco: client.endereco || ""
+        };
+      }
+
+      async function importClients() {
+        log.textContent = "Buscando clientes do SQLite...";
+
+        try {
+          const response = await fetch("/api/clients");
+
+          if (!response.ok) {
+            throw new Error("Não consegui acessar /api/clients. Abra essa página pelo servidor local.");
+          }
+
+          const data = await response.json();
+          const clients = data.clients || [];
+
+          writeLog(`Clientes encontrados: ${clients.length}`);
+
+          for (const client of clients) {
+            const id = client.id ? String(client.id) : crypto.randomUUID();
+
+            await setDoc(
+              doc(db, "clients", `client-${id}`),
+              cleanClient(client),
+              { merge: true }
+            );
+
+            writeLog(`Importado: ${client.nome || "Cliente sem nome"} (${id})`);
+          }
+
+          writeLog("");
+          writeLog("Importação de clientes finalizada com sucesso.");
+          writeLog("Agora confira no Firebase > Firestore > clients.");
+        } catch (error) {
+          writeLog("");
+          writeLog("Erro:");
+          writeLog(error.message);
+          console.error(error);
+        }
+      }
+
+      button.addEventListener("click", importClients);
+    </script>
+  </body>
+</html>

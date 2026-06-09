@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Importar mesas para Firebase</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 32px;
+        background: #f9f4ee;
+        color: #1e0f05;
+      }
+
+      button {
+        padding: 14px 22px;
+        border: 0;
+        border-radius: 10px;
+        background: #b8722a;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      pre {
+        margin-top: 24px;
+        padding: 16px;
+        background: white;
+        border-radius: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Importar mesas para Firebase</h1>
+
+    <p>
+      Clique no botão abaixo para criar as mesas de 1 a 12 na coleção
+      <strong>tables</strong>.
+    </p>
+
+    <button id="importButton">Importar mesas</button>
+
+    <pre id="log">Aguardando...</pre>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+      import {
+        getFirestore,
+        doc,
+        setDoc
+      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAP8BZ8MRBIR4OfdTM4shp24qumZdZVF1A",
+        authDomain: "brewers-pdv-e5886.firebaseapp.com",
+        projectId: "brewers-pdv-e5886",
+        storageBucket: "brewers-pdv-e5886.firebasestorage.app",
+        messagingSenderId: "43541055382",
+        appId: "1:43541055382:web:94abd22fb62941b9783fb7"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const log = document.querySelector("#log");
+      const button = document.querySelector("#importButton");
+
+      function writeLog(message) {
+        log.textContent += `\n${message}`;
+      }
+
+      async function importTables() {
+        log.textContent = "Criando mesas...";
+
+        try {
+          for (let i = 1; i <= 12; i++) {
+            const table = {
+              nome: `Mesa ${i}`,
+              numero: i,
+              active: true
+            };
+
+            await setDoc(doc(db, "tables", `mesa-${i}`), table, { merge: true });
+
+            writeLog(`Importada: Mesa ${i}`);
+          }
+
+          writeLog("");
+          writeLog("Importação de mesas finalizada com sucesso.");
+          writeLog("Agora confira no Firebase > Firestore > tables.");
+        } catch (error) {
+          writeLog("");
+          writeLog("Erro:");
+          writeLog(error.message);
+          console.error(error);
+        }
+      }
+
+      button.addEventListener("click", importTables);
+    </script>
+  </body>
+</html>

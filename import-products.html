@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Importar produtos para Firebase</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 32px;
+        background: #f9f4ee;
+        color: #1e0f05;
+      }
+
+      button {
+        padding: 14px 22px;
+        border: 0;
+        border-radius: 10px;
+        background: #b8722a;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      pre {
+        margin-top: 24px;
+        padding: 16px;
+        background: white;
+        border-radius: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Importar produtos para Firebase</h1>
+
+    <p>
+      Clique no botão abaixo para buscar os produtos do SQLite pela rota
+      <strong>/api/products</strong> e enviar tudo para a coleção
+      <strong>products</strong> do Firestore.
+    </p>
+
+    <button id="importButton">Importar produtos</button>
+
+    <pre id="log">Aguardando...</pre>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+      import {
+        getFirestore,
+        doc,
+        setDoc
+      } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAP8BZ8MRBIR4OfdTM4shp24qumZdZVF1A",
+        authDomain: "brewers-pdv-e5886.firebaseapp.com",
+        projectId: "brewers-pdv-e5886",
+        storageBucket: "brewers-pdv-e5886.firebasestorage.app",
+        messagingSenderId: "43541055382",
+        appId: "1:43541055382:web:94abd22fb62941b9783fb7"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const log = document.querySelector("#log");
+      const button = document.querySelector("#importButton");
+
+      function writeLog(message) {
+        log.textContent += `\n${message}`;
+      }
+
+      function cleanProduct(product) {
+        return {
+          nome: product.nome || "",
+          categoria: product.categoria || "",
+          descricao: product.descricao || "",
+          preco: Number(product.preco || 0),
+          tamanho: product.tamanho || "",
+          opcoes: Array.isArray(product.opcoes) ? product.opcoes : [],
+          imagem: product.imagem || "assets/logo-brewers.svg",
+          frame: product.frame || "",
+          active: product.active !== false
+        };
+      }
+
+      async function importProducts() {
+        log.textContent = "Buscando produtos do SQLite...";
+
+        try {
+          const response = await fetch("/api/products");
+
+          if (!response.ok) {
+            throw new Error("Não consegui acessar /api/products. Abra essa página pelo servidor local, não direto pelo arquivo.");
+          }
+
+          const data = await response.json();
+          const products = data.products || [];
+
+          writeLog(`Produtos encontrados: ${products.length}`);
+
+          for (const product of products) {
+            if (!product.id) {
+              writeLog("Produto ignorado porque não tem ID.");
+              continue;
+            }
+
+            await setDoc(
+              doc(db, "products", String(product.id)),
+              cleanProduct(product),
+              { merge: true }
+            );
+
+            writeLog(`Importado: ${product.nome} (${product.id})`);
+          }
+
+          writeLog("");
+          writeLog("Importação finalizada com sucesso.");
+          writeLog("Agora confira no Firebase > Firestore > products.");
+        } catch (error) {
+          writeLog("");
+          writeLog("Erro:");
+          writeLog(error.message);
+          console.error(error);
+        }
+      }
+
+      button.addEventListener("click", importProducts);
+    </script>
+  </body>
+</html>
