@@ -5,8 +5,11 @@ import {
   getTables,
   saveTable,
   deleteTable,
+  saveProduct,
+  deleteProduct,
+  uploadProductImage,
   listenOrders
-} from "./firebase-service.js";
+} from "./supabase-service.js";
 
 const categories = ["Bebidas Quentes", "Bebidas Geladas", "Salgados", "Doces"];
 function loadStaffTables() {
@@ -2441,48 +2444,75 @@ async function saveCashClose() {
 
 async function saveProductFromModal(target) {
   const dialog = target.closest(".staff-dialog");
+
   const nome = dialog.querySelector("[name='productName']")?.value.trim();
+
   if (!nome) {
     showToast("Informe o nome do produto.");
     return;
   }
+
   const category = dialog.querySelector("[name='productCategory']")?.value || "Bebidas Quentes";
   const preco = parseMoneyInput(dialog.querySelector("[name='productPrice']")?.value);
   const descricao = dialog.querySelector("[name='productDescription']")?.value.trim() || "Produto cadastrado pelo painel.";
+
   const fileInput = dialog.querySelector("[data-product-image-input]");
   const imageValue = dialog.querySelector("[name='productImageValue']")?.value || "";
-  const imagem = imageValue || await readFileAsDataUrl(fileInput?.files?.[0]) || "assets/logo-brewers.svg";
-  const optionInputs = [...dialog.querySelectorAll("[name='productOption[]']")];
-  const priceInputs = [...dialog.querySelectorAll("[name='productOptionPrice[]']")];
-  const opcoes = optionInputs
-    .map((input, index) => {
-      const label = input.value.trim();
-      if (!label) return "";
-      const price = parseMoneyInput(priceInputs[index]?.value);
-      return price > 0 ? `${label} | + R$${price.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : label;
-    })
-    .filter(Boolean);
-  const product = {
-    id: slugify(nome),
-    nome,
-    categoria: category,
-    descricao,
-    preco,
-    tamanho: "",
-    opcoes,
-    imagem,
-    frame: "Cadastro do atendente",
-    active: true
-  };
 
-  const data = await apiRequest("/api/products", {
-    method: "POST",
-    body: JSON.stringify(product)
-  });
-  const savedProduct = data?.product || product;
-  products = [savedProduct, ...products.filter((item) => item.id !== savedProduct.id)];
-  state.staffModal = null;
-  render();
+  let imagem = imageValue || "assets/logo-brewers.svg";
+
+  try {
+    if (fileInput?.files?.[0]) {
+      imagem = await uploadProductImage(fileInput.files[0]);
+    }
+
+    const optionInputs = [...dialog.querySelectorAll("[name='productOption[]']")];
+    const priceInputs = [...dialog.querySelectorAll("[name='productOptionPrice[]']")];
+
+    const opcoes = optionInputs
+      .map((input, index) => {
+        const label = input.value.trim();
+
+        if (!label) return "";
+
+        const price = parseMoneyInput(priceInputs[index]?.value);
+
+        return price > 0
+          ? `${label} | + R$${price.toLocaleString("pt-BR", {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2
+            })}`
+          : label;
+      })
+      .filter(Boolean);
+
+    const product = {
+      id: slugify(nome),
+      nome,
+      categoria: category,
+      descricao,
+      preco,
+      tamanho: "",
+      opcoes,
+      imagem,
+      frame: "Cadastro do atendente",
+      active: true
+    };
+
+    const savedProduct = await saveProduct(product);
+
+    products = [
+      savedProduct,
+      ...products.filter((item) => item.id !== savedProduct.id)
+    ];
+
+    state.staffModal = null;
+    render();
+    showToast(`${nome} cadastrado no Supabase.`);
+  } catch (error) {
+    console.error("Erro ao salvar produto:", error);
+    showToast("Erro ao salvar produto. Veja o console.");
+  }
 }
 
 async function saveClientFromModal(target) {
@@ -2542,19 +2572,37 @@ function updateReportDatesFromInputs() {
   state.staffReportEndDate = formatBirthDateInput(end);
 }
 
-function deleteTableFromSettings(tableName) {
+async function deleteTableFromSettings(tableName) {
   const hasOpenOrder = state.staffOrders.some((order) => order.mesa === tableName && order.status !== "Entregue");
+
   if (hasOpenOrder) {
     showToast("Não é possível excluir uma mesa ocupada.");
     return;
   }
+
   const index = staffTables.findIndex((table) => table === tableName);
-  if (index < 0) return;
-  staffTables.splice(index, 1);
-  saveStaffTables();
-  state.staffModal = "tables";
-  render();
-  showToast(`${tableName} excluída.`);
+
+  if (index < 0) {
+    return;
+  }
+
+  const numero = Number(String(tableName).match(/\d+/)?.[0] || 0);
+  const tableId = numero ? `mesa-${numero}` : slugify(tableName);
+
+  try {
+    await deleteTable(tableId);
+
+    staffTables.splice(index, 1);
+    saveStaffTables();
+
+    state.staffModal = "tables";
+    render();
+
+    showToast(`${tableName} excluída do Supabase.`);
+  } catch (error) {
+    console.error("Erro ao excluir mesa:", error);
+    showToast("Erro ao excluir mesa. Veja o console.");
+  }
 }
 
 async function deleteClientFromTable(clientId, clientIndex) {
@@ -2571,25 +2619,53 @@ async function deleteClientFromTable(clientId, clientIndex) {
 
 async function toggleProductActive(productId) {
   const product = productById(productId);
-  if (!product) return;
-  const nextActive = product.active === false;
-  product.active = nextActive;
-  const data = await apiRequest(`/api/products/${productId}`, {
-    method: "PATCH",
-    body: JSON.stringify({ active: nextActive })
-  });
-  if (data?.product) {
-    products = products.map((item) => item.id === productId ? data.product : item);
+
+  if (!product) {
+    return;
   }
-  render();
+
+  const nextActive = product.active === false;
+
+  try {
+    const updatedProduct = {
+      ...product,
+      active: nextActive
+    };
+
+    const savedProduct = await saveProduct(updatedProduct);
+
+    products = products.map((item) =>
+      item.id === productId ? savedProduct : item
+    );
+
+    render();
+    showToast(`${product.nome} ${nextActive ? "ativado" : "desativado"}.`);
+  } catch (error) {
+    console.error("Erro ao alterar produto:", error);
+    showToast("Erro ao alterar produto. Veja o console.");
+  }
 }
 
 async function deleteProductFromMenu(productId) {
   const product = productById(productId);
-  if (!product) return;
-  await apiRequest(`/api/products/${productId}`, { method: "DELETE" });
-  products = products.filter((item) => item.id !== productId);
-  render();
+
+  if (!product) {
+    return;
+  }
+
+  try {
+    await deleteProduct(productId);
+
+    products = products.map((item) =>
+      item.id === productId ? { ...item, active: false } : item
+    );
+
+    render();
+    showToast(`${product.nome} excluído do cardápio.`);
+  } catch (error) {
+    console.error("Erro ao excluir produto:", error);
+    showToast("Erro ao excluir produto. Veja o console.");
+  }
 }
 
 function requestDeleteConfirmation(type, label, payload = {}) {
@@ -2616,7 +2692,7 @@ async function confirmPendingDelete() {
     return;
   }
   if (request.type === "table") {
-    deleteTableFromSettings(request.tableName);
+    await deleteTableFromSettings(request.tableName);
     return;
   }
   if (request.type === "cart") {
