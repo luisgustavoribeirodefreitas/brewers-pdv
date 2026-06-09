@@ -83,6 +83,33 @@ export async function getTables() {
     .sort((a, b) => Number(a.numero || 0) - Number(b.numero || 0));
 }
 
+export async function saveTable(tableName) {
+  const numero = Number(String(tableName).match(/\d+/)?.[0] || 0);
+  const tableId = numero ? `mesa-${numero}` : tableName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  const tableData = {
+    nome: tableName,
+    numero,
+    active: true
+  };
+
+  await setDoc(doc(db, "tables", tableId), tableData, { merge: true });
+
+  return {
+    id: tableId,
+    ...tableData
+  };
+}
+
+export async function deleteTable(tableId) {
+  await deleteDoc(doc(db, "tables", String(tableId)));
+}
+
 /* =========================
    CLIENTES
 ========================= */

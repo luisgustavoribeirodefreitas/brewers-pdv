@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>Importar dados para Supabase</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 32px;
+        background: #f9f4ee;
+        color: #1e0f05;
+      }
+
+      button {
+        padding: 14px 22px;
+        border: 0;
+        border-radius: 10px;
+        background: #b8722a;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      pre {
+        margin-top: 24px;
+        padding: 16px;
+        background: white;
+        border-radius: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Importar dados para Supabase</h1>
+
+    <p>
+      Este importador busca produtos e clientes do SQLite pela API local e cria
+      também as mesas no Supabase.
+    </p>
+
+    <button id="importButton">Importar produtos, clientes e mesas</button>
+
+    <pre id="log">Aguardando...</pre>
+
+    <script type="module">
+      import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+      const SUPABASE_URL = "https://kicsxisicdvdsurrcxvz.supabase.co";
+
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpY3N4aXNpY2R2ZHN1cnJjeHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5Njg5MTcsImV4cCI6MjA5NjU0NDkxN30.qO671Qw3ILnO3onTePevXXcSWFJDv8qMXrhMBUDJQJg";
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const log = document.querySelector("#log");
+      const button = document.querySelector("#importButton");
+
+      function writeLog(message) {
+        log.textContent += `\n${message}`;
+      }
+
+      function cleanProduct(product) {
+        return {
+          id: String(product.id),
+          nome: product.nome || "",
+          categoria: product.categoria || "",
+          descricao: product.descricao || "",
+          preco: Number(product.preco || 0),
+          tamanho: product.tamanho || "",
+          opcoes: Array.isArray(product.opcoes) ? product.opcoes : [],
+          imagem: product.imagem || "assets/logo-brewers.svg",
+          frame: product.frame || "",
+          active: product.active !== false
+        };
+      }
+
+      function cleanClient(client) {
+        return {
+          id: client.id ? `client-${client.id}` : crypto.randomUUID(),
+          nome: client.nome || "",
+          cpf: client.cpf || "",
+          celular: client.celular || "",
+          nascimento: client.nascimento || "",
+          endereco: client.endereco || ""
+        };
+      }
+
+      async function importProducts() {
+        writeLog("Buscando produtos do SQLite...");
+
+        const response = await fetch("/api/products");
+
+        if (!response.ok) {
+          throw new Error("Não consegui acessar /api/products. Abra esta página pelo servidor local.");
+        }
+
+        const data = await response.json();
+        const products = data.products || [];
+
+        writeLog(`Produtos encontrados: ${products.length}`);
+
+        const cleanedProducts = products.map(cleanProduct);
+
+        const { error } = await supabase
+          .from("products")
+          .upsert(cleanedProducts, { onConflict: "id" });
+
+        if (error) {
+          throw error;
+        }
+
+        for (const product of cleanedProducts) {
+          writeLog(`Produto importado: ${product.nome} (${product.id})`);
+        }
+      }
+
+      async function importClients() {
+        writeLog("");
+        writeLog("Buscando clientes do SQLite...");
+
+        const response = await fetch("/api/clients");
+
+        if (!response.ok) {
+          throw new Error("Não consegui acessar /api/clients. Abra esta página pelo servidor local.");
+        }
+
+        const data = await response.json();
+        const clients = data.clients || [];
+
+        writeLog(`Clientes encontrados: ${clients.length}`);
+
+        const cleanedClients = clients.map(cleanClient);
+
+        const { error } = await supabase
+          .from("clients")
+          .upsert(cleanedClients, { onConflict: "id" });
+
+        if (error) {
+          throw error;
+        }
+
+        for (const client of cleanedClients) {
+          writeLog(`Cliente importado: ${client.nome} (${client.id})`);
+        }
+      }
+
+      async function importTables() {
+        writeLog("");
+        writeLog("Criando mesas...");
+
+        const tables = [];
+
+        for (let i = 1; i <= 12; i++) {
+          tables.push({
+            id: `mesa-${i}`,
+            nome: `Mesa ${i}`,
+            numero: i,
+            active: true
+          });
+        }
+
+        const { error } = await supabase
+          .from("tables")
+          .upsert(tables, { onConflict: "id" });
+
+        if (error) {
+          throw error;
+        }
+
+        for (const table of tables) {
+          writeLog(`Mesa importada: ${table.nome}`);
+        }
+      }
+
+      async function runImport() {
+        log.textContent = "Iniciando importação para Supabase...";
+
+        try {
+          await importProducts();
+          await importClients();
+          await importTables();
+
+          writeLog("");
+          writeLog("Importação finalizada com sucesso.");
+          writeLog("Confira em Supabase > Table Editor.");
+        } catch (error) {
+          writeLog("");
+          writeLog("Erro:");
+          writeLog(error.message);
+          console.error(error);
+        }
+      }
+
+      button.addEventListener("click", runImport);
+    </script>
+  </body>
+</html>

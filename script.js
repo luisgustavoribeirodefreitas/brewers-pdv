@@ -1,3 +1,13 @@
+import {
+  getProducts,
+  getClients,
+  getCash,
+  getTables,
+  saveTable,
+  deleteTable,
+  listenOrders
+} from "./firebase-service.js";
+
 const categories = ["Bebidas Quentes", "Bebidas Geladas", "Salgados", "Doces"];
 function loadStaffTables() {
   try {
@@ -636,29 +646,52 @@ async function staffAuthRequest(path, payload) {
 }
 
 async function syncProducts() {
-  const data = await apiRequest("/api/products");
-  if (Array.isArray(data?.products)) products = data.products;
+  const firebaseProducts = await getProducts();
+
+  if (Array.isArray(firebaseProducts) && firebaseProducts.length) {
+    products = firebaseProducts;
+  }
 }
 
-async function syncOrders() {
-  const data = await apiRequest("/api/orders");
-  if (data?.orders) state.staffOrders = data.orders.map(orderFromApi);
+function syncOrders() {
+  return listenOrders((firebaseOrders) => {
+    state.staffOrders = firebaseOrders.map(orderFromApi);
+    render();
+  });
 }
 
 async function syncClients() {
-  const data = await apiRequest("/api/clients");
-  if (data?.clients) state.staffClients = data.clients;
+  const firebaseClients = await getClients();
+
+  if (Array.isArray(firebaseClients)) {
+    state.staffClients = firebaseClients;
+  }
 }
 
 async function syncCash() {
-  const data = await apiRequest("/api/cash");
-  if (data) state.cashOpen = Boolean(data.is_open);
+  const cash = await getCash();
+
+  if (cash) {
+    state.cashOpen = Boolean(cash.is_open);
+  }
+}
+
+async function syncTables() {
+  const firebaseTables = await getTables();
+
+  if (Array.isArray(firebaseTables) && firebaseTables.length) {
+    staffTables.length = 0;
+    staffTables.push(...firebaseTables.map((table) => table.nome));
+    saveStaffTables();
+  }
 }
 
 async function bootstrap() {
-  await Promise.all([syncProducts(), syncOrders(), syncClients(), syncCash()]);
+  await Promise.all([syncProducts(), syncClients(), syncCash(), syncTables()]);
+  syncOrders();
   render();
 }
+
 
 function setView(view) {
   if (view === "welcome") {
@@ -2476,7 +2509,7 @@ async function saveClientFromModal(target) {
   render();
 }
 
-function saveNewTableFromModal(target) {
+async function saveNewTableFromModal(target) {
   const dialog = target.closest(".staff-dialog");
   const rawName = dialog?.querySelector("[name='tableName']")?.value.trim();
   const tableName = rawName || nextStaffTableName();
@@ -2486,17 +2519,20 @@ function saveNewTableFromModal(target) {
     return;
   }
 
-  staffTables.push(tableName);
-  staffTables.sort((a, b) => {
-    const aNum = Number(String(a).match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
-    const bNum = Number(String(b).match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
-    if (aNum !== bNum) return aNum - bNum;
-    return a.localeCompare(b, "pt-BR");
-  });
-  saveStaffTables();
-  state.staffModal = "tables";
-  render();
-  showToast(`${tableName} cadastrada.`);
+await saveTable(tableName);
+
+staffTables.push(tableName);
+staffTables.sort((a, b) => {
+  const aNum = Number(String(a).match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
+  const bNum = Number(String(b).match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
+  if (aNum !== bNum) return aNum - bNum;
+  return a.localeCompare(b, "pt-BR");
+});
+
+saveStaffTables();
+state.staffModal = "tables";
+render();
+showToast(`${tableName} cadastrada.`);
 }
 
 function updateReportDatesFromInputs() {
