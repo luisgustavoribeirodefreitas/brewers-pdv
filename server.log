@@ -18816,3 +18816,7 @@ ConnectionAbortedError: [WinError 10053] Uma conexão estabelecida foi anulada pe
 127.0.0.1 - - [09/Jun/2026 16:50:23] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
 127.0.0.1 - - [09/Jun/2026 16:50:23] "GET /supabase-service.js HTTP/1.1" 200 -
 127.0.0.1 - - [09/Jun/2026 16:50:23] "GET /assets/logo-brewers.svg HTTP/1.1" 200 -
+127.0.0.1 - - [09/Jun/2026 17:07:05] "GET /assets/icon-login-orders.svg HTTP/1.1" 200 -
+127.0.0.1 - - [09/Jun/2026 17:07:05] "GET /assets/icon-login-tables.svg HTTP/1.1" 200 -
+127.0.0.1 - - [09/Jun/2026 17:07:05] "GET /assets/icon-login-billing.svg HTTP/1.1" 200 -
+127.0.0.1 - - [09/Jun/2026 17:07:05] "GET /assets/icon-login-reports.svg HTTP/1.1" 200 -

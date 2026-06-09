@@ -15,6 +15,107 @@ function slugify(text) {
     .replace(/^-+|-+$/g, "");
 }
 
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(String(password || ""));
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+
+  return hashArray
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/* =========================
+   FUNCIONÁRIOS
+========================= */
+
+export async function loginStaffUserSupabase(username, password) {
+  const normalizedUsername = String(username || "").trim().toLowerCase();
+  const passwordHash = await hashPassword(password);
+
+  const { data: user, error } = await supabase
+    .from("staff_users")
+    .select("*")
+    .eq("username", normalizedUsername)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!user || user.password_hash !== passwordHash) {
+    throw new Error("Usuário ou senha inválidos.");
+  }
+
+  return {
+    id: user.id,
+    username: user.username,
+    firstName: user.first_name || "",
+    lastName: user.last_name || "",
+    authorizedBy: user.authorized_by || "",
+    subtitle: user.authorized_by
+      ? `Autorizado por ${user.authorized_by}`
+      : "Equipe Brewers"
+  };
+}
+
+export async function registerStaffUserSupabase({
+  username,
+  password,
+  firstName,
+  lastName,
+  authorizedBy
+}) {
+  const normalizedUsername = String(username || "").trim().toLowerCase();
+  const passwordHash = await hashPassword(password);
+
+  const userData = {
+    id: crypto.randomUUID(),
+    username: normalizedUsername,
+    password_hash: passwordHash,
+    first_name: firstName || "",
+    last_name: lastName || "",
+    authorized_by: authorizedBy || "",
+    created_at: new Date().toISOString()
+  };
+
+  const { data: existingUser, error: existingError } = await supabase
+    .from("staff_users")
+    .select("id")
+    .eq("username", normalizedUsername)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  if (existingUser) {
+    throw new Error("Usuário já cadastrado.");
+  }
+
+  const { data: createdUser, error } = await supabase
+    .from("staff_users")
+    .insert(userData)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    id: createdUser.id,
+    username: createdUser.username,
+    firstName: createdUser.first_name || "",
+    lastName: createdUser.last_name || "",
+    authorizedBy: createdUser.authorized_by || "",
+    subtitle: createdUser.authorized_by
+      ? `Autorizado por ${createdUser.authorized_by}`
+      : "Equipe Brewers"
+  };
+}
+
 /* =========================
    PRODUTOS
 ========================= */
